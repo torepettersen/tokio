@@ -421,6 +421,9 @@ cfg_sync! {
     mod mutex;
     pub use mutex::{Mutex, MutexGuard};
 
+    mod notify;
+    pub use notify::Notify;
+
     pub mod oneshot;
 
     pub(crate) mod semaphore_ll;
