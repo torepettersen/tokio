@@ -5,7 +5,7 @@ cfg_io_driver! {
 
 pub(crate) mod linked_list;
 
-#[cfg(any(feature = "rt-threaded", feature = "macros"))]
+#[cfg(any(feature = "rt-threaded", feature = "macros", feature = "stream"))]
 mod rand;
 
 cfg_rt_threaded! {
@@ -18,6 +18,6 @@ cfg_rt_threaded! {
     pub(crate) use try_lock::TryLock;
 }
 
-cfg_macros! {
-    pub use rand::thread_rng_n;
-}
+#[cfg(any(feature = "macros", feature = "stream"))]
+#[cfg_attr(not(feature = "macros"), allow(unreachable_pub))]
+pub use rand::thread_rng_n;
