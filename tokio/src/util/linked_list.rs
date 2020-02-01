@@ -182,14 +182,6 @@ mod tests {
         ret
     }
 
-    /*
-    unsafe fn collect_reverse_list<T: Copy>(list: LinkedList<T>) -> Vec<T> {
-        list.into_reverse_iter()
-            .map(|item| (*(*item).deref()))
-            .collect()
-    }
-    */
-
     unsafe fn push_all(
         list: &mut LinkedList<i32>,
         entries: &mut [Pin<&mut Entry<i32>>],
@@ -204,6 +196,14 @@ mod tests {
             assert!($e.next.is_none());
             assert!($e.prev.is_none());
         }};
+    }
+
+
+    macro_rules! assert_ptr_eq {
+        ($a:expr, $b:expr) => {{
+            // Deal with mapping a Pin<&mut T> -> Option<NonNull<T>>
+            assert_eq!(Some($a.as_mut().get_unchecked_mut().into()), $b)
+        }}
     }
 
     #[test]
@@ -288,153 +288,124 @@ mod tests {
             // `b` should be no longer there and can't be removed twice
             assert!(!list.remove(c.as_mut()));
             assert!(list.is_empty());
-
-            /*
-            // Validate the state of things
-            assert_eq!(&mut b as *mut Entry<i32>, list.head);
-            assert_eq!(&mut c as *mut Entry<i32>, b.next);
-            assert_eq!(&mut b as *mut Entry<i32>, c.prev);
-
-            let items: Vec<i32> = collect_list(list);
-            assert_eq!([7, 31].to_vec(), items);
-
-            let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut c, &mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut a));
-            assert_clean(&mut a);
-            // a should be no longer there and can't be removed twice
-            assert_eq!(false, list.remove(&mut a));
-            assert_eq!(&mut c as *mut Entry<i32>, b.next);
-            assert_eq!(&mut b as *mut Entry<i32>, c.prev);
-            let items: Vec<i32> = collect_reverse_list(list);
-            assert_eq!([31, 7].to_vec(), items);
-            */
         }
 
-        /*
-        {
+        unsafe {
             // Remove middle
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut c, &mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut b));
-            assert_clean(&mut b);
-            assert_eq!(&mut c as *mut Entry<i32>, a.next);
-            assert_eq!(&mut a as *mut Entry<i32>, c.prev);
-            let items: Vec<i32> = collect_list(list);
-            assert_eq!([5, 31].to_vec(), items);
 
+            push_all(&mut list, &mut [c.as_mut(), b.as_mut(), a.as_mut()]);
+
+            assert!(list.remove(a.as_mut()));
+            assert_clean!(a);
+
+            assert_ptr_eq!(b, list.head);
+            assert_ptr_eq!(c, b.next);
+            assert_ptr_eq!(b, c.prev);
+
+            let items = collect_list(&mut list);
+            assert_eq!([31, 7].to_vec(), items);
+        }
+
+        unsafe {
+            // Remove middle
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut c, &mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut b));
-            assert_clean(&mut b);
-            assert_eq!(&mut c as *mut Entry<i32>, a.next);
-            assert_eq!(&mut a as *mut Entry<i32>, c.prev);
-            let items: Vec<i32> = collect_reverse_list(list);
+
+            push_all(&mut list, &mut [c.as_mut(), b.as_mut(), a.as_mut()]);
+
+            assert!(list.remove(b.as_mut()));
+            assert_clean!(b);
+
+            assert_ptr_eq!(c, a.next);
+            assert_ptr_eq!(a, c.prev);
+
+            let items = collect_list(&mut list);
             assert_eq!([31, 5].to_vec(), items);
         }
 
-        {
+        unsafe {
             // Remove last
+            // Remove middle
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut c, &mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut c));
-            assert_clean(&mut c);
-            assert!(b.next.is_null());
-            assert_eq!(&mut b as *mut Entry<i32>, list.tail);
-            let items: Vec<i32> = collect_list(list);
-            assert_eq!([5, 7].to_vec(), items);
 
-            let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut c, &mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut c));
-            assert_clean(&mut c);
-            assert!(b.next.is_null());
-            assert_eq!(&mut b as *mut Entry<i32>, list.tail);
-            let items: Vec<i32> = collect_reverse_list(list);
+            push_all(&mut list, &mut [c.as_mut(), b.as_mut(), a.as_mut()]);
+
+            assert!(list.remove(c.as_mut()));
+            assert_clean!(c);
+
+            assert!(b.next.is_none());
+            assert_ptr_eq!(b, list.tail);
+
+            let items = collect_list(&mut list);
             assert_eq!([7, 5].to_vec(), items);
         }
 
-        {
+        unsafe {
             // Remove first of two
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut a));
-            assert_clean(&mut a);
-            // a should be no longer there and can't be removed twice
-            assert_eq!(false, list.remove(&mut a));
-            assert_eq!(&mut b as *mut Entry<i32>, list.head);
-            assert_eq!(&mut b as *mut Entry<i32>, list.tail);
-            assert!(b.next.is_null());
-            assert!(b.prev.is_null());
-            let items: Vec<i32> = collect_list(list);
-            assert_eq!([7].to_vec(), items);
 
-            let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut a));
-            assert_clean(&mut a);
+            push_all(&mut list, &mut [b.as_mut(), a.as_mut()]);
+
+            assert!(list.remove(a.as_mut()));
+
+            assert_clean!(a);
+
             // a should be no longer there and can't be removed twice
-            assert_eq!(false, list.remove(&mut a));
-            assert_eq!(&mut b as *mut Entry<i32>, list.head);
-            assert_eq!(&mut b as *mut Entry<i32>, list.tail);
-            assert!(b.next.is_null());
-            assert!(b.prev.is_null());
-            let items: Vec<i32> = collect_reverse_list(list);
+            assert!(!list.remove(a.as_mut()));
+
+            assert_ptr_eq!(b, list.head);
+            assert_ptr_eq!(b, list.tail);
+
+            assert!(b.next.is_none());
+            assert!(b.prev.is_none());
+
+            let items = collect_list(&mut list);
             assert_eq!([7].to_vec(), items);
         }
 
-        {
+        unsafe {
             // Remove last of two
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut b));
-            assert_clean(&mut b);
-            assert_eq!(&mut a as *mut Entry<i32>, list.head);
-            assert_eq!(&mut a as *mut Entry<i32>, list.tail);
-            assert!(a.next.is_null());
-            assert!(a.prev.is_null());
-            let items: Vec<i32> = collect_list(list);
-            assert_eq!([5].to_vec(), items);
 
-            let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut b, &mut a]);
-            assert_eq!(true, list.remove(&mut b));
-            assert_clean(&mut b);
-            assert_eq!(&mut a as *mut Entry<i32>, list.head);
-            assert_eq!(&mut a as *mut Entry<i32>, list.tail);
-            assert!(a.next.is_null());
-            assert!(a.prev.is_null());
-            let items: Vec<i32> = collect_reverse_list(list);
+            push_all(&mut list, &mut [b.as_mut(), a.as_mut()]);
+
+            assert!(list.remove(b.as_mut()));
+
+            assert_clean!(b);
+
+            assert_ptr_eq!(a, list.head);
+            assert_ptr_eq!(a, list.tail);
+
+            assert!(a.next.is_none());
+            assert!(a.prev.is_none());
+
+            let items = collect_list(&mut list);
             assert_eq!([5].to_vec(), items);
         }
 
-        {
+        unsafe {
             // Remove last item
             let mut list = LinkedList::new();
-            add_nodes(&mut list, &mut [&mut a]);
-            assert_eq!(true, list.remove(&mut a));
-            assert_clean(&mut a);
-            assert!(list.head.is_null());
-            assert!(list.tail.is_null());
-            let items: Vec<i32> = collect_list(list);
+
+            push_all(&mut list, &mut [a.as_mut()]);
+
+            assert!(list.remove(a.as_mut()));
+            assert_clean!(a);
+
+            assert!(list.head.is_none());
+            assert!(list.tail.is_none());
+            let items = collect_list(&mut list);
             assert!(items.is_empty());
         }
 
-        {
+        unsafe {
             // Remove missing
             let mut list = LinkedList::new();
-            list.add_front(&mut b);
-            list.add_front(&mut a);
-            assert_eq!(false, list.remove(&mut c));
-        }
 
-        {
-            // Remove null
-            let mut list = LinkedList::new();
-            list.add_front(&mut b);
-            list.add_front(&mut a);
-            assert_eq!(false, list.remove(null_mut()));
+            list.push_front(b.as_mut());
+            list.push_front(a.as_mut());
+
+            assert!(!list.remove(c.as_mut()));
         }
-        */
     }
 }
